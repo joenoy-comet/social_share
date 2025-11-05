@@ -92,15 +92,70 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
   }
     
     public func sharer(_ sharer: Sharing, didCompleteWithResults results: [String : Any]) {
-        flutterResult(shareUtil.SUCCESS)
+        // COMPREHENSIVE LOGGING to understand Facebook SDK behavior
+        print("========================================")
+        print("Facebook Share - didCompleteWithResults called")
+        print("Timestamp: \(Date())")
+        print("========================================")
+
+        // Log ALL keys and values in results dictionary
+        print("Results dictionary count: \(results.count)")
+        print("Results dictionary: \(results)")
+
+        // Log each key-value pair individually for clarity
+        for (key, value) in results {
+            print("  Key: '\(key)' → Value: '\(value)' (Type: \(type(of: value)))")
+        }
+
+        // Check for all possible known keys
+        print("Checking known keys:")
+        print("  - postId: \(results["postId"] ?? "nil")")
+        print("  - completionGesture: \(results["completionGesture"] ?? "nil")")
+        print("  - didComplete: \(results["didComplete"] ?? "nil")")
+        print("  - error: \(results["error"] ?? "nil")")
+        print("========================================")
+
+        // Check if results contain postId (rare but indicates confirmed post)
+        if let postId = results["postId"] as? String, !postId.isEmpty {
+            print("✅ SUCCESS_WITH_POST_ID: PostId found!")
+            flutterResult(shareUtil.SUCCESS_WITH_POST_ID)
+        } else if results.isEmpty {
+            // Empty results - Facebook SDK doesn't provide any information
+            print("⚠️ SUCCESS_NO_POST_ID: Results dictionary is EMPTY")
+            print("   This means Facebook SDK provides no completion information")
+            print("   User may or may not have posted - SDK doesn't tell us")
+            flutterResult(shareUtil.SUCCESS_NO_POST_ID)
+        } else {
+            // Results has some data but no postId
+            print("⚠️ SUCCESS_NO_POST_ID: Results has data but no postId")
+            print("   Checking completionGesture for hints...")
+
+            if let gesture = results["completionGesture"] as? String {
+                print("   CompletionGesture value: '\(gesture)'")
+                // Maybe we can use this to detect successful posting?
+            }
+
+            flutterResult(shareUtil.SUCCESS_NO_POST_ID)
+        }
+        print("========================================")
      }
-     
+
      public func sharer(_ sharer: Sharing, didFailWithError error: Error) {
+         print("========================================")
+         print("Facebook Share - didFailWithError")
+         print("Timestamp: \(Date())")
+         print("Error: \(error.localizedDescription)")
+         print("========================================")
          flutterResult(shareUtil.ERROR)
      }
-     
+
      public func sharerDidCancel(_ sharer: Sharing) {
-         flutterResult(shareUtil.ERROR)
+         print("========================================")
+         print("Facebook Share - sharerDidCancel")
+         print("Timestamp: \(Date())")
+         print("User explicitly cancelled or dismissed dialog")
+         print("========================================")
+         flutterResult(shareUtil.CANCELLED)
      }
     
     

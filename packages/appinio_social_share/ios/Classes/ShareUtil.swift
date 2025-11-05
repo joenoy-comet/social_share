@@ -9,6 +9,9 @@ import MobileCoreServices
 public class ShareUtil{
 
     public let SUCCESS: String = "SUCCESS"
+    public let SUCCESS_WITH_POST_ID: String = "SUCCESS_WITH_POST_ID"
+    public let SUCCESS_NO_POST_ID: String = "SUCCESS_NO_POST_ID"
+    public let CANCELLED: String = "CANCELLED"
     public let ERROR_APP_NOT_AVAILABLE: String = "ERROR_APP_NOT_AVAILABLE"
     public let ERROR_FEATURE_NOT_AVAILABLE_FOR_THIS_VERSON: String = "ERROR_FEATURE_NOT_AVAILABLE_FOR_THIS_VERSON"
     public let ERROR: String = "ERROR"
@@ -294,28 +297,69 @@ public class ShareUtil{
     func shareToFacebookPost(args : [String: Any?],result: @escaping FlutterResult, delegate: SharingDelegate) {
         let message = args[self.argMessage] as? String
         let imagePaths = args[self.argImagePaths] as? [String]
-        
-        let content = SharePhotoContent()
-        var photos : [SharePhoto] = []
-        for image in imagePaths! {
-            let photo = SharePhoto(image: UIImage.init(contentsOfFile: image)!, isUserGenerated: true)
-            photos.append(photo)
+
+        // Check if we have photos or text/link only
+        if imagePaths == nil || imagePaths!.isEmpty {
+            // TEXT/LINK ONLY: Use ShareLinkContent
+            let content = ShareLinkContent()
+
+            // Extract URL from message
+            if let messageText = message {
+                let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+                let range = NSRange(location: 0, length: messageText.utf16.count)
+                let matches = detector?.matches(in: messageText, options: [], range: range)
+
+                if let match = matches?.first, let url = match.url {
+                    content.contentURL = url
+                } else {
+                    // No URL found, ShareLinkContent requires URL
+                    result(ERROR)
+                    return
+                }
+            } else {
+                result(ERROR)
+                return
+            }
+
+            let dialog = ShareDialog(
+                viewController: UIApplication.shared.windows.first!.rootViewController,
+                content: content,
+                delegate: delegate
+            )
+
+            do {
+                try dialog.validate()
+            } catch {
+                result(ERROR)
+                return
+            }
+            dialog.show()
+            // Don't return result here - let the SharingDelegate callbacks handle it
+        } else {
+            // PHOTOS: Use SharePhotoContent (original code)
+            let content = SharePhotoContent()
+            var photos : [SharePhoto] = []
+            for image in imagePaths! {
+                let photo = SharePhoto(image: UIImage.init(contentsOfFile: image)!, isUserGenerated: true)
+                photos.append(photo)
+            }
+            content.photos = photos
+            content.hashtag = Hashtag(message!)
+            let dialog = ShareDialog(
+                viewController: UIApplication.shared.windows.first!.rootViewController,
+                content: content,
+                delegate: delegate
+            )
+            do {
+                try dialog.validate()
+            } catch {
+               result(ERROR)
+               return
+            }
+            dialog.show()
+            // Don't return result here - let the SharingDelegate callbacks handle it
         }
-        content.photos = photos
-        content.hashtag = Hashtag(message!)
-        let dialog = ShareDialog(
-            viewController: UIApplication.shared.windows.first!.rootViewController,
-            content: content,
-            delegate: delegate
-        )
-        do {
-            try dialog.validate()
-        } catch {
-           result(ERROR)
-        }
-        dialog.show()
-        result(self.SUCCESS)
-        
+
     }
     
     

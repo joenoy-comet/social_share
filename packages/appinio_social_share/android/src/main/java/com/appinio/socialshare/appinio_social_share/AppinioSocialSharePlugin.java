@@ -2,6 +2,7 @@ package com.appinio.socialshare.appinio_social_share;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -18,11 +19,12 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+import io.flutter.plugin.common.PluginRegistry;
 
 /**
  * AppinioSocialSharePlugin
  */
-public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
+public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener {
 
     private final String INSTALLED_APPS = "installed_apps";
     private final String INSTAGRAM_DIRECT = "instagram_direct";
@@ -49,6 +51,7 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
     private SocialShareUtil socialShareUtil;
     private MethodChannel channel;
     private Activity activity;
+    private ActivityPluginBinding activityPluginBinding;
     private Context activeContext;
     private Context context;
 
@@ -144,7 +147,8 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
     @Override
     public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
         activity = binding.getActivity();
-
+        activityPluginBinding = binding;
+        binding.addActivityResultListener(this);
     }
 
     @Override
@@ -161,6 +165,25 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
 
     @Override
     public void onDetachedFromActivity() {
+        if (activityPluginBinding != null) {
+            activityPluginBinding.removeActivityResultListener(this);
+            activityPluginBinding = null;
+        }
         activity = null;
+    }
+
+    @Override
+    public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+        // Handle Facebook share activity result
+        if (requestCode == SocialShareUtil.FACEBOOK_SHARE_REQUEST_CODE) {
+            SocialShareUtil.handleFacebookShareResult(resultCode);
+            return true;
+        }
+
+        // Forward other activity results to Facebook's CallbackManager (for SDK shares)
+        if (socialShareUtil != null && socialShareUtil.getCallbackManager() != null) {
+            return socialShareUtil.getCallbackManager().onActivityResult(requestCode, resultCode, data);
+        }
+        return false;
     }
 }
