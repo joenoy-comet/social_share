@@ -6,7 +6,7 @@ import Photos
 
 
 
-public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDelegate {
+public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDelegate, UIDocumentInteractionControllerDelegate {
 
     private let INSTAGRAM_DIRECT:String = "instagram_direct";
     private let INSTAGRAM_STORIES:String = "instagram_stories";
@@ -138,6 +138,11 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
                 self.pendingWhatsappResult = nil
             }
         }
+    }
+
+    // UIDocumentInteractionControllerDelegate - Required for presentPreview
+    public func documentInteractionControllerViewControllerForPreview(_ controller: UIDocumentInteractionController) -> UIViewController {
+        return UIApplication.topViewController()!
     }
 
     public func sharer(_ sharer: Sharing, didCompleteWithResults results: [String : Any]) {
