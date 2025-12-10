@@ -30,10 +30,8 @@ public class ShareUtil{
     let argImages: String  = "images";
     let argVideoFile: String  = "videoFile";
 
-    // Keep reference to prevent deallocation during share flow
-    private var documentInteractionController: UIDocumentInteractionController?
 
-
+    
     public func getInstalledApps(result: @escaping FlutterResult){
         let apps = [["instagram","instagram"],["facebook-stories","facebook_stories"],["whatsapp","whatsapp"],["tg","telegram"],["fb-messenger","messenger"],["tiktok","snssdk1233"],["instagram-stories","instagram_stories"],["twitter","twitter"],["sms","message"]]
         var output:[String: Bool] = [:]
@@ -965,14 +963,14 @@ public class ShareUtil{
                             let tempFile = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents/whatsAppTmp.wai")
                             do {
                                 try imageData.write(to: tempFile, options: .atomic)
-                                self.documentInteractionController = UIDocumentInteractionController(url: tempFile)
-                                self.documentInteractionController?.uti = "net.whatsapp.image"
-                                self.documentInteractionController?.delegate = delegate as? UIDocumentInteractionControllerDelegate
-                                self.documentInteractionController?.presentPreview(animated: true)
-                                result(self.SUCCESS)
+                                let documentInteractionController = UIDocumentInteractionController(url: tempFile)
+                                documentInteractionController.uti = "net.whatsapp.image"
+                                // Use presentPreview to go directly to WhatsApp instead of generic share sheet
+                                documentInteractionController.delegate = delegate as? UIDocumentInteractionControllerDelegate
+                                documentInteractionController.presentPreview(animated: true)
+
                             } catch {
                                 print(error)
-                                result(self.ERROR)
                             }
                         }
                     
@@ -1008,10 +1006,10 @@ public class ShareUtil{
                         let tempFile = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents/whatsAppTmp.wai")
                         do {
                             try imageData.write(to: tempFile, options: .atomic)
-                            self.documentInteractionController = UIDocumentInteractionController(url: tempFile)
-                            self.documentInteractionController?.uti = "net.whatsapp.image"
-                            self.documentInteractionController?.delegate = delegate as? UIDocumentInteractionControllerDelegate
-                            self.documentInteractionController?.presentPreview(animated: true)
+                            let documentInteractionController = UIDocumentInteractionController(url: tempFile)
+                            documentInteractionController.uti = "net.whatsapp.image"
+                            documentInteractionController.delegate = delegate as? UIDocumentInteractionControllerDelegate
+                            documentInteractionController.presentPreview(animated: true)
                             print("📤 WhatsApp image share opened, waiting for delegate callbacks...")
                             // Result handled by delegate methods: didEndSendingToApplication + documentInteractionControllerDidEndPreview
                         } catch {
