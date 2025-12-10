@@ -67,13 +67,11 @@ public class SocialShareUtil {
     public static final int FACEBOOK_SHARE_REQUEST_CODE = 64206;
     public static final int INSTAGRAM_SHARE_REQUEST_CODE = 64207;
     public static final int TWITTER_SHARE_REQUEST_CODE = 64208;
-    public static final int WHATSAPP_SHARE_REQUEST_CODE = 64209;
 
     private static CallbackManager callbackManager;
     private static MethodChannel.Result pendingFacebookResult;
     private static MethodChannel.Result pendingInstagramResult;
     private static MethodChannel.Result pendingTwitterResult;
-    private static MethodChannel.Result pendingWhatsappResult;
 
     // Getter for CallbackManager to allow activity result forwarding
     public CallbackManager getCallbackManager() {
@@ -164,111 +162,6 @@ public class SocialShareUtil {
         pendingTwitterResult = null;
     }
 
-    // Handle activity result for WhatsApp share
-    public static void handleWhatsappShareResult(int resultCode) {
-        if (pendingWhatsappResult == null) {
-            System.out.println("⚠️ No pending WhatsApp result to handle");
-            return;
-        }
-
-        System.out.println("========================================");
-        System.out.println("WhatsApp Share Activity Result");
-        System.out.println("resultCode: " + resultCode);
-        System.out.println("========================================");
-
-        if (resultCode == android.app.Activity.RESULT_OK) {
-            System.out.println("✅ SUCCESS_NO_POST_ID: User returned from WhatsApp");
-            pendingWhatsappResult.success(SUCCESS_NO_POST_ID);
-        } else if (resultCode == android.app.Activity.RESULT_CANCELED) {
-            System.out.println("❌ CANCELLED: User cancelled or dismissed");
-            pendingWhatsappResult.success(CANCELLED);
-        } else {
-            System.out.println("⚠️ Unknown result code: " + resultCode);
-            pendingWhatsappResult.success(SUCCESS_NO_POST_ID);
-        }
-
-        pendingWhatsappResult = null;
-    }
-
-    // Share to Instagram with result tracking
-    public void shareToInstagramFeedWithResult(String imagePath, String message, Activity activity, MethodChannel.Result result) {
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        if (imagePath != null) {
-            Uri fileUri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".provider", new File(imagePath));
-            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-            shareIntent.setType(getMimeTypeOfFile(imagePath));
-        } else {
-            shareIntent.setType("text/plain");
-        }
-        shareIntent.putExtra(Intent.EXTRA_TEXT, message);
-        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        shareIntent.setPackage(INSTAGRAM_PACKAGE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            shareIntent.setComponent(ComponentName.createRelative(INSTAGRAM_PACKAGE,
-                "com.instagram.share.handleractivity.ShareHandlerActivity"));
-        }
-
-        if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
-            pendingInstagramResult = result;
-            activity.startActivityForResult(
-                Intent.createChooser(shareIntent, "Share to Instagram"),
-                INSTAGRAM_SHARE_REQUEST_CODE
-            );
-        } else {
-            result.success(ERROR_APP_NOT_AVAILABLE);
-        }
-    }
-
-    // Share to Twitter with result tracking
-    public void shareToTwitterWithResult(String imagePath, String message, Activity activity, MethodChannel.Result result) {
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        if (imagePath != null) {
-            Uri fileUri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".provider", new File(imagePath));
-            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-            shareIntent.setType(getMimeTypeOfFile(imagePath));
-        } else {
-            shareIntent.setType("text/plain");
-        }
-        shareIntent.putExtra(Intent.EXTRA_TEXT, message);
-        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        shareIntent.setPackage(TWITTER_PACKAGE);
-
-        if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
-            pendingTwitterResult = result;
-            activity.startActivityForResult(
-                Intent.createChooser(shareIntent, "Share to X"),
-                TWITTER_SHARE_REQUEST_CODE
-            );
-        } else {
-            result.success(ERROR_APP_NOT_AVAILABLE);
-        }
-    }
-
-    // Share to WhatsApp with result tracking
-    public void shareToWhatsAppWithResult(String imagePath, String message, Activity activity, MethodChannel.Result result) {
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        if (imagePath != null) {
-            Uri fileUri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".provider", new File(imagePath));
-            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-            shareIntent.setType(getMimeTypeOfFile(imagePath));
-        } else {
-            shareIntent.setType("text/plain");
-        }
-        shareIntent.putExtra(Intent.EXTRA_TEXT, message);
-        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        shareIntent.setPackage(WHATSAPP_PACKAGE);
-
-        if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
-            pendingWhatsappResult = result;
-            activity.startActivityForResult(
-                Intent.createChooser(shareIntent, "Share to WhatsApp"),
-                WHATSAPP_SHARE_REQUEST_CODE
-            );
-        } else {
-            result.success(ERROR_APP_NOT_AVAILABLE);
-        }
-    }
-
     public String shareToWhatsApp(String imagePath, String msg, Context context) {
         return shareFileAndTextToPackage(imagePath, msg, context, WHATSAPP_PACKAGE);
     }
@@ -282,8 +175,31 @@ public class SocialShareUtil {
         return shareTextToPackage(text, activity, INSTAGRAM_PACKAGE);
     }
 
-    public String shareToInstagramFeed(String imagePath, String message, Context activity, String text) {
-        return shareFileAndTextToPackage(imagePath, text, activity, INSTAGRAM_PACKAGE);
+    public void shareToInstagramFeed(String imagePath, String message, Activity activity, String text, MethodChannel.Result result) {
+        try {
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            if (imagePath != null) {
+                Uri fileUri = FileProvider.getUriForFile(activity, activity.getApplicationContext().getPackageName() + ".provider", new File(imagePath));
+                shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                shareIntent.setType(getMimeTypeOfFile(imagePath));
+            } else {
+                shareIntent.setType("text/plain");
+            }
+            shareIntent.putExtra(Intent.EXTRA_TEXT, text);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            shareIntent.setPackage(INSTAGRAM_PACKAGE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                shareIntent.setComponent(ComponentName.createRelative(INSTAGRAM_PACKAGE, "com.instagram.share.handleractivity.ShareHandlerActivity"));
+            }
+
+            System.out.println("🚀 Launching Instagram share with result tracking...");
+            pendingInstagramResult = result;
+            activity.startActivityForResult(shareIntent, INSTAGRAM_SHARE_REQUEST_CODE);
+            System.out.println("⏳ Waiting for Instagram activity result...");
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.success("ERROR: " + e.getLocalizedMessage());
+        }
     }
 
     public String shareToInstagramFeedFiles(ArrayList<String> imagePaths, Context activity, String text) {
@@ -294,8 +210,28 @@ public class SocialShareUtil {
         return shareFilesToPackage(imagePaths, activity, TIKTOK_PACKAGE);
     }
 
-    public String shareToTwitter(String imagePath, Context activity, String text) {
-        return shareFileAndTextToPackage(imagePath, text, activity, TWITTER_PACKAGE);
+    public void shareToTwitter(String imagePath, Activity activity, String text, MethodChannel.Result result) {
+        try {
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            if (imagePath != null) {
+                Uri fileUri = FileProvider.getUriForFile(activity, activity.getApplicationContext().getPackageName() + ".provider", new File(imagePath));
+                shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                shareIntent.setType(getMimeTypeOfFile(imagePath));
+            } else {
+                shareIntent.setType("text/plain");
+            }
+            shareIntent.putExtra(Intent.EXTRA_TEXT, text);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            shareIntent.setPackage(TWITTER_PACKAGE);
+
+            System.out.println("🚀 Launching Twitter share with result tracking...");
+            pendingTwitterResult = result;
+            activity.startActivityForResult(shareIntent, TWITTER_SHARE_REQUEST_CODE);
+            System.out.println("⏳ Waiting for Twitter activity result...");
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.success("ERROR: " + e.getLocalizedMessage());
+        }
     }
 
     public String shareToTwitterFiles(ArrayList<String> imagePaths, Context activity) {
