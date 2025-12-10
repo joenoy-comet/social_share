@@ -31,9 +31,11 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
     private var pendingInstagramResult: FlutterResult?
     private var pendingTwitterResult: FlutterResult?
     private var pendingWhatsappResult: FlutterResult?
+    private var whatsappImageDidSend: Bool = false
+    private var instagramImageDidSend: Bool = false
 
 
-    
+
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "appinio_social_share", binaryMessenger: registrar.messenger())
     let instance = SwiftAppinioSocialSharePlugin()
@@ -62,7 +64,8 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
           break
       case INSTAGRAM_POST:
           pendingInstagramResult = result
-          shareUtil.shareToInstagramFeedWithPendingResult(args:args!)
+          instagramImageDidSend = false
+          shareUtil.shareToInstagramFeedWithDelegate(args:args!, delegate: self)
           break
       case INSTAGRAM_STORIES:
           shareUtil.shareToInstagramStory(args:args!,result:result)
@@ -71,15 +74,15 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
           shareUtil.shareToFacebookStory(args:args!,result:result)
           break
       case WHATSAPP_IMG_IOS:
-          shareUtil.shareImageToWhatsApp(args:args!, result:result,delegate: self)
+          pendingWhatsappResult = result
+          whatsappImageDidSend = false
+          shareUtil.shareImageToWhatsAppWithPendingResult(args:args!, delegate: self)
           break
       case WHATSAPP:
-          pendingWhatsappResult = result
-          shareUtil.shareToWhatsAppWithPendingResult(args:args!)
+          shareUtil.shareToWhatsAppWithCompletion(args:args!, result: result)
           break
       case TWITTER:
-          pendingTwitterResult = result
-          shareUtil.shareToTwitterWithPendingResult(args:args!)
+          shareUtil.shareToTwitterWithCompletion(args:args!, result: result)
           break
       case SMS:
           shareUtil.shareToSms(args: args!, result: result)
@@ -108,41 +111,94 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
   }
 
     // Handler for app returning to foreground after sharing
+    // Note: Most shares now use proper callbacks:
+    // - Twitter: SLComposeViewController completion handler
+    // - WhatsApp text: UIActivityViewController completion handler
+    // - WhatsApp image: UIDocumentInteractionController delegate
+    // - Instagram image: UIDocumentInteractionController delegate
+    // - Instagram video: UIDocumentInteractionController delegate (falls back here if needed)
     @objc func appDidBecomeActive() {
-        // Small delay to ensure share completed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self = self else { return }
-
-            if let result = self.pendingInstagramResult {
-                print("========================================")
-                print("Instagram Share - App became active")
-                print("Returning SUCCESS_NO_POST_ID")
-                print("========================================")
-                result(self.shareUtil.SUCCESS_NO_POST_ID)
-                self.pendingInstagramResult = nil
-            }
-            if let result = self.pendingTwitterResult {
-                print("========================================")
-                print("Twitter Share - App became active")
-                print("Returning SUCCESS_NO_POST_ID")
-                print("========================================")
-                result(self.shareUtil.SUCCESS_NO_POST_ID)
-                self.pendingTwitterResult = nil
-            }
-            if let result = self.pendingWhatsappResult {
-                print("========================================")
-                print("WhatsApp Share - App became active")
-                print("Returning SUCCESS_NO_POST_ID")
-                print("========================================")
-                result(self.shareUtil.SUCCESS_NO_POST_ID)
-                self.pendingWhatsappResult = nil
-            }
-        }
+        // This is now only a fallback for edge cases
+        // Most results are handled by their respective completion handlers/delegates
     }
 
     // UIDocumentInteractionControllerDelegate - Required for presentPreview
     public func documentInteractionControllerViewControllerForPreview(_ controller: UIDocumentInteractionController) -> UIViewController {
         return UIApplication.topViewController()!
+    }
+
+    // Called when user successfully sends to an application (WhatsApp or Instagram)
+    public func documentInteractionController(_ controller: UIDocumentInteractionController, didEndSendingToApplication application: String?) {
+        print("========================================")
+        print("UIDocumentInteractionController - didEndSendingToApplication: \(application ?? "unknown")")
+        print("========================================")
+
+        // Determine which share completed based on the application
+        if application?.contains("whatsapp") == true || pendingWhatsappResult != nil {
+            whatsappImageDidSend = true
+        }
+        if application?.contains("instagram") == true || pendingInstagramResult != nil {
+            instagramImageDidSend = true
+        }
+    }
+
+    // Called when the preview/interaction ends
+    public func documentInteractionControllerDidEndPreview(_ controller: UIDocumentInteractionController) {
+        print("========================================")
+        print("UIDocumentInteractionController - Preview ended")
+        print("whatsappDidSend: \(whatsappImageDidSend), instagramDidSend: \(instagramImageDidSend)")
+        print("========================================")
+
+        // Handle WhatsApp image result
+        if let result = pendingWhatsappResult {
+            if whatsappImageDidSend {
+                print("✅ WhatsApp: SUCCESS_NO_POST_ID - User completed share")
+                result(shareUtil.SUCCESS_NO_POST_ID)
+            } else {
+                print("❌ WhatsApp: CANCELLED - User dismissed without sharing")
+                result(shareUtil.CANCELLED)
+            }
+            pendingWhatsappResult = nil
+        }
+
+        // Handle Instagram image result
+        if let result = pendingInstagramResult {
+            if instagramImageDidSend {
+                print("✅ Instagram: SUCCESS_NO_POST_ID - User completed share")
+                result(shareUtil.SUCCESS_NO_POST_ID)
+            } else {
+                print("❌ Instagram: CANCELLED - User dismissed without sharing")
+                result(shareUtil.CANCELLED)
+            }
+            pendingInstagramResult = nil
+        }
+
+        // Reset flags
+        whatsappImageDidSend = false
+        instagramImageDidSend = false
+    }
+
+    // Called when the open-in menu is dismissed (for Instagram using presentOpenInMenu)
+    public func documentInteractionControllerDidDismissOpenInMenu(_ controller: UIDocumentInteractionController) {
+        print("========================================")
+        print("UIDocumentInteractionController - OpenInMenu dismissed")
+        print("instagramDidSend: \(instagramImageDidSend)")
+        print("========================================")
+
+        // Handle Instagram result (only if not already handled)
+        if let result = pendingInstagramResult {
+            if instagramImageDidSend {
+                print("✅ Instagram: SUCCESS_NO_POST_ID - User completed share")
+                result(shareUtil.SUCCESS_NO_POST_ID)
+            } else {
+                print("❌ Instagram: CANCELLED - User dismissed without sharing")
+                result(shareUtil.CANCELLED)
+            }
+            pendingInstagramResult = nil
+        }
+
+        // Reset flag
+        instagramImageDidSend = false
     }
 
     public func sharer(_ sharer: Sharing, didCompleteWithResults results: [String : Any]) {

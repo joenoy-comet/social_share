@@ -364,6 +364,77 @@ public class ShareUtil{
         })
     }
 
+    // Instagram share with UIDocumentInteractionController for proper CANCELLED detection
+    public func shareToInstagramFeedWithDelegate(args : [String: Any?], delegate: SharingDelegate) {
+        let filePath = args[argImagePath] as? String
+
+        guard let path = filePath else {
+            print("❌ No file path provided for Instagram share")
+            return
+        }
+
+        // Check if Instagram is available
+        guard let instagramURL = URL(string: "instagram://app"),
+              UIApplication.shared.canOpenURL(instagramURL) else {
+            print("❌ Instagram not available")
+            return
+        }
+
+        let url = URL(fileURLWithPath: path)
+
+        // Check if it's a video or image
+        if !isImage(filePath: path) {
+            // Video sharing with UIDocumentInteractionController
+            shareVideoToInstagramWithDelegate(videoPath: path, delegate: delegate)
+            return
+        }
+
+        guard let image = UIImage(contentsOfFile: url.path) else {
+            print("❌ Could not load image for Instagram share")
+            return
+        }
+
+        // Save image to temp file with .ig extension for Instagram
+        if let imageData = image.jpegData(compressionQuality: 1.0) {
+            let tempFile = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("instagram_share.igo")
+            do {
+                try imageData.write(to: tempFile, options: .atomic)
+                let documentInteractionController = UIDocumentInteractionController(url: tempFile)
+                documentInteractionController.uti = "com.instagram.exclusivegram"
+                documentInteractionController.delegate = delegate as? UIDocumentInteractionControllerDelegate
+                documentInteractionController.presentOpenInMenu(from: CGRect.zero, in: UIApplication.topViewController()!.view, animated: true)
+                print("📤 Instagram image share opened via UIDocumentInteractionController, waiting for delegate callbacks...")
+                // Result handled by delegate methods: didEndSendingToApplication + documentInteractionControllerDidDismissOpenInMenu
+            } catch {
+                print("❌ Error writing temp file for Instagram: \(error)")
+            }
+        }
+    }
+
+    // Instagram video share with UIDocumentInteractionController for proper CANCELLED detection
+    private func shareVideoToInstagramWithDelegate(videoPath: String, delegate: SharingDelegate) {
+        let videoURL = URL(fileURLWithPath: videoPath)
+
+        // Copy video to temp location with proper extension
+        let tempFile = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("instagram_share.mov")
+        do {
+            // Remove existing temp file if any
+            if FileManager.default.fileExists(atPath: tempFile.path) {
+                try FileManager.default.removeItem(at: tempFile)
+            }
+            try FileManager.default.copyItem(at: videoURL, to: tempFile)
+
+            let documentInteractionController = UIDocumentInteractionController(url: tempFile)
+            documentInteractionController.uti = "com.instagram.exclusivegram"
+            documentInteractionController.delegate = delegate as? UIDocumentInteractionControllerDelegate
+            documentInteractionController.presentOpenInMenu(from: CGRect.zero, in: UIApplication.topViewController()!.view, animated: true)
+            print("📤 Instagram video share opened via UIDocumentInteractionController, waiting for delegate callbacks...")
+            // Result handled by delegate methods: didEndSendingToApplication + documentInteractionControllerDidDismissOpenInMenu
+        } catch {
+            print("❌ Error copying video file for Instagram: \(error)")
+        }
+    }
+
     public func shareToSystem(args : [String: Any?],result: @escaping FlutterResult) {
         let text = args[argMessage] as? String
         let filePaths = args[argImagePaths] as? [String]
@@ -426,9 +497,76 @@ public class ShareUtil{
             print("❌ WhatsApp not available")
         }
     }
-    
-    
-    
+
+    // WhatsApp text share with UIActivityViewController for proper CANCELLED detection
+    func shareToWhatsAppWithCompletion(args : [String: Any?], result: @escaping FlutterResult) {
+        let message = args[self.argMessage] as? String
+
+        guard let text = message else {
+            print("❌ No message provided for WhatsApp share")
+            result(ERROR)
+            return
+        }
+
+        // Check if WhatsApp is available
+        guard let whatsappURL = URL(string: "whatsapp://app"),
+              UIApplication.shared.canOpenURL(whatsappURL) else {
+            print("❌ WhatsApp not available")
+            result(ERROR_APP_NOT_AVAILABLE)
+            return
+        }
+
+        // Use UIActivityViewController with completion handler
+        let activityItems: [Any] = [text]
+        let activityVC = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+
+        // Exclude other apps to encourage WhatsApp selection
+        activityVC.excludedActivityTypes = [
+            .addToReadingList,
+            .assignToContact,
+            .print,
+            .saveToCameraRoll
+        ]
+
+        // Set completion handler for proper result detection
+        activityVC.completionWithItemsHandler = { (activityType, completed, returnedItems, error) in
+            print("========================================")
+            print("WhatsApp Text Share - Activity completed")
+            print("activityType: \(activityType?.rawValue ?? "nil")")
+            print("completed: \(completed)")
+            print("========================================")
+
+            if let error = error {
+                print("❌ Error: \(error.localizedDescription)")
+                result(self.ERROR)
+                return
+            }
+
+            if completed {
+                print("✅ SUCCESS_NO_POST_ID: User completed share")
+                result(self.SUCCESS_NO_POST_ID)
+            } else {
+                print("❌ CANCELLED: User cancelled share")
+                result(self.CANCELLED)
+            }
+        }
+
+        // Present the activity view controller
+        if let viewController = UIApplication.topViewController() {
+            // For iPad, set the popover presentation
+            if let popover = activityVC.popoverPresentationController {
+                popover.sourceView = viewController.view
+                popover.sourceRect = CGRect(x: viewController.view.bounds.midX, y: viewController.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            viewController.present(activityVC, animated: true, completion: nil)
+            print("📤 WhatsApp share sheet presented, waiting for completion...")
+        } else {
+            print("❌ Could not get top view controller")
+            result(ERROR)
+        }
+    }
+
     func shareToFacebookPost(args : [String: Any?],result: @escaping FlutterResult, delegate: SharingDelegate) {
         let message = args[self.argMessage] as? String
         let imagePaths = args[self.argImagePaths] as? [String]
@@ -693,6 +831,56 @@ public class ShareUtil{
         print("📤 Twitter compose controller presented, waiting for app to become active...")
     }
 
+    // Twitter share with completion handler for proper CANCELLED detection
+    func shareToTwitterWithCompletion(args : [String: Any?], result: @escaping FlutterResult) {
+        let title = args[self.argMessage] as? String
+        let images = args[self.argImagePaths] as? [String]
+
+        if(!canOpenUrl(appName: "twitter")){
+            print("❌ Twitter not available")
+            result(ERROR_APP_NOT_AVAILABLE)
+            return
+        }
+
+        let composeCtl = SLComposeViewController(forServiceType: SLServiceTypeTwitter)
+        if #unavailable(iOS 16) {
+            composeCtl?.add(URL(string: title!))
+        }
+        if(!(images==nil)){
+            for image in images! {
+                composeCtl?.add(UIImage.init(contentsOfFile: image))
+            }
+        }
+        composeCtl?.setInitialText(title!)
+
+        // Set completion handler for proper result detection
+        composeCtl?.completionHandler = { [weak self] (composeResult: SLComposeViewControllerResult) in
+            DispatchQueue.main.async {
+                switch composeResult {
+                case .done:
+                    print("========================================")
+                    print("Twitter Share - Completed")
+                    print("✅ SUCCESS_NO_POST_ID")
+                    print("========================================")
+                    result(self?.SUCCESS_NO_POST_ID ?? "SUCCESS_NO_POST_ID")
+                case .cancelled:
+                    print("========================================")
+                    print("Twitter Share - Cancelled")
+                    print("❌ CANCELLED")
+                    print("========================================")
+                    result(self?.CANCELLED ?? "CANCELLED")
+                @unknown default:
+                    print("========================================")
+                    print("Twitter Share - Unknown result")
+                    print("========================================")
+                    result(self?.SUCCESS_NO_POST_ID ?? "SUCCESS_NO_POST_ID")
+                }
+            }
+        }
+
+        UIApplication.topViewController()?.present(composeCtl!, animated: true, completion: nil)
+    }
+
 
     func shareToInstagramStory(args : [String: Any?],result: @escaping FlutterResult) {
         if #available(iOS 10.0, *){
@@ -793,7 +981,48 @@ public class ShareUtil{
             }
         }
     }
-    
+
+    // WhatsApp image share - result handled by UIDocumentInteractionController delegate
+    public func shareImageToWhatsAppWithPendingResult(args : [String: Any?], delegate: SharingDelegate) {
+        let imagePath = args[argImagePath] as? String
+
+        guard let path = imagePath else {
+            print("❌ No image path provided")
+            return
+        }
+
+        let url = URL(fileURLWithPath: path)
+
+        guard let image = UIImage(contentsOfFile: url.path) else {
+            print("❌ Could not load image")
+            return
+        }
+
+        let urlWhats = "whatsapp://app"
+        if let urlString = urlWhats.addingPercentEncoding(withAllowedCharacters:CharacterSet.urlQueryAllowed) {
+            if let whatsappURL = URL(string: urlString) {
+                if UIApplication.shared.canOpenURL(whatsappURL as URL) {
+                    if let imageData = image.jpegData(compressionQuality: 1.0) {
+                        let tempFile = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents/whatsAppTmp.wai")
+                        do {
+                            try imageData.write(to: tempFile, options: .atomic)
+                            let documentInteractionController = UIDocumentInteractionController(url: tempFile)
+                            documentInteractionController.uti = "net.whatsapp.image"
+                            documentInteractionController.delegate = delegate as? UIDocumentInteractionControllerDelegate
+                            documentInteractionController.presentPreview(animated: true)
+                            print("📤 WhatsApp image share opened, waiting for delegate callbacks...")
+                            // Result handled by delegate methods: didEndSendingToApplication + documentInteractionControllerDidEndPreview
+                        } catch {
+                            print("❌ Error writing temp file: \(error)")
+                        }
+                    }
+                } else {
+                    print("❌ Cannot open WhatsApp")
+                }
+            }
+        }
+    }
+
 }
 
 extension UIApplication {

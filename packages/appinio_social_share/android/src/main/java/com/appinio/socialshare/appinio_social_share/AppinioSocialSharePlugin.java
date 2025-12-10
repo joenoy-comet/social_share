@@ -113,7 +113,9 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
                 socialShareUtil.shareToFacebook(imagePaths, message, activity, result);
                 return null;
             case WHATSAPP_ANDROID:
-                return socialShareUtil.shareToWhatsApp(imagePath, message, activeContext);
+                if (activity == null) return SocialShareUtil.UNKNOWN_ERROR;
+                socialShareUtil.shareToWhatsApp(imagePath, message, activity, result);
+                return null;
             case WHATSAPP_ANDROID_MULTIFILES:
                 return socialShareUtil.shareToWhatsAppFiles(imagePaths, activeContext);
             case TELEGRAM_ANDROID:
@@ -193,6 +195,12 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
         // Handle Twitter share activity result
         if (requestCode == SocialShareUtil.TWITTER_SHARE_REQUEST_CODE) {
             SocialShareUtil.handleTwitterShareResult(resultCode);
+            return true;
+        }
+
+        // Handle WhatsApp share activity result
+        if (requestCode == SocialShareUtil.WHATSAPP_SHARE_REQUEST_CODE) {
+            SocialShareUtil.handleWhatsAppShareResult(resultCode);
             return true;
         }
 
