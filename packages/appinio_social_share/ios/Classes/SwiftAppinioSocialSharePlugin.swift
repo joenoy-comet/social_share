@@ -27,12 +27,25 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
     var shareUtil = ShareUtil()
     var flutterResult: FlutterResult!
 
+    // Pending results for tracking share completion
+    private var pendingInstagramResult: FlutterResult?
+    private var pendingTwitterResult: FlutterResult?
+    private var pendingWhatsappResult: FlutterResult?
+
 
     
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "appinio_social_share", binaryMessenger: registrar.messenger())
     let instance = SwiftAppinioSocialSharePlugin()
     registrar.addMethodCallDelegate(instance, channel: channel)
+
+    // Add lifecycle observer to detect when app returns from share
+    NotificationCenter.default.addObserver(
+        instance,
+        selector: #selector(appDidBecomeActive),
+        name: UIApplication.didBecomeActiveNotification,
+        object: nil
+    )
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -48,7 +61,8 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
           shareUtil.shareToInstagramDirect(args:args!,result: result)
           break
       case INSTAGRAM_POST:
-          shareUtil.shareToInstagramFeed(args:args!,result: result)
+          pendingInstagramResult = result
+          shareUtil.shareToInstagramFeedWithPendingResult(args:args!)
           break
       case INSTAGRAM_STORIES:
           shareUtil.shareToInstagramStory(args:args!,result:result)
@@ -60,10 +74,12 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
           shareUtil.shareImageToWhatsApp(args:args!, result:result,delegate: self)
           break
       case WHATSAPP:
-          shareUtil.shareToWhatsApp(args:args!, result:result)
+          pendingWhatsappResult = result
+          shareUtil.shareToWhatsAppWithPendingResult(args:args!)
           break
       case TWITTER:
-          shareUtil.shareToTwitter(args:args!,result:result)
+          pendingTwitterResult = result
+          shareUtil.shareToTwitterWithPendingResult(args:args!)
           break
       case SMS:
           shareUtil.shareToSms(args: args!, result: result)
@@ -90,7 +106,40 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
           result(shareUtil.ERROR)
       }
   }
-    
+
+    // Handler for app returning to foreground after sharing
+    @objc func appDidBecomeActive() {
+        // Small delay to ensure share completed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+
+            if let result = self.pendingInstagramResult {
+                print("========================================")
+                print("Instagram Share - App became active")
+                print("Returning SUCCESS_NO_POST_ID")
+                print("========================================")
+                result(self.shareUtil.SUCCESS_NO_POST_ID)
+                self.pendingInstagramResult = nil
+            }
+            if let result = self.pendingTwitterResult {
+                print("========================================")
+                print("Twitter Share - App became active")
+                print("Returning SUCCESS_NO_POST_ID")
+                print("========================================")
+                result(self.shareUtil.SUCCESS_NO_POST_ID)
+                self.pendingTwitterResult = nil
+            }
+            if let result = self.pendingWhatsappResult {
+                print("========================================")
+                print("WhatsApp Share - App became active")
+                print("Returning SUCCESS_NO_POST_ID")
+                print("========================================")
+                result(self.shareUtil.SUCCESS_NO_POST_ID)
+                self.pendingWhatsappResult = nil
+            }
+        }
+    }
+
     public func sharer(_ sharer: Sharing, didCompleteWithResults results: [String : Any]) {
         // COMPREHENSIVE LOGGING to understand Facebook SDK behavior
         print("========================================")

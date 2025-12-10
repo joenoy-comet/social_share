@@ -250,6 +250,119 @@ public class ShareUtil{
         }
     }
 
+    // Instagram share with pending result (result handled by lifecycle observer)
+    public func shareToInstagramFeedWithPendingResult(args : [String: Any?]) {
+        let filePath = args[argImagePath] as? String
+        if(!isImage(filePath: filePath!)) {
+            return shareVideoToInstagramFeedWithPendingResult(args: args)
+        } else{
+            return shareImageToInstagramFeedWithPendingResult(args: args)
+        }
+    }
+
+    func shareVideoToInstagramFeedWithPendingResult(args : [String: Any?]) {
+        let videoFile = args[argImagePath] as? String
+        let backgroundVideoUrl = URL(fileURLWithPath: videoFile!)
+        let videoData = try? Data(contentsOf: backgroundVideoUrl) as NSData
+
+        getLibraryPermissionIfNecessary { granted in
+            guard granted else {
+                print("❌ Photo library permission denied")
+                return
+            }
+        }
+
+        PHPhotoLibrary.shared().performChanges({
+            let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0];
+            let filePath = "\(documentsPath)/\(Date().description).mp4"
+            videoData!.write(toFile: filePath, atomically: true)
+            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: URL(fileURLWithPath: filePath))
+        },
+        completionHandler: { success, error in
+            if success {
+                let fetchOptions = PHFetchOptions()
+                fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                let fetchResult = PHAsset.fetchAssets(with: .video, options: fetchOptions)
+
+                if let lastAsset = fetchResult.firstObject {
+                    let localIdentifier = lastAsset.localIdentifier
+                    let urlFeed = "instagram://library?LocalIdentifier=" + localIdentifier
+
+                    guard let url = URL(string: urlFeed) else {
+                        print("❌ Invalid Instagram URL")
+                        return
+                    }
+                    DispatchQueue.main.async {
+                        if UIApplication.shared.canOpenURL(url) {
+                            if #available(iOS 10.0, *) {
+                                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                                print("📤 Instagram opened with video, waiting for app to become active...")
+                            } else {
+                                UIApplication.shared.openURL(url)
+                                print("📤 Instagram opened with video, waiting for app to become active...")
+                            }
+                        } else {
+                            print("❌ Cannot open Instagram URL")
+                        }
+                    }
+                }
+            } else if let error = error {
+                print("❌ Error: \(error.localizedDescription)")
+            }
+        })
+    }
+
+    func shareImageToInstagramFeedWithPendingResult(args : [String: Any?]) {
+        let videoFile = args[argImagePath] as? String
+        let backgroundVideoUrl = URL(fileURLWithPath: videoFile!)
+        let videoData = try? Data(contentsOf: backgroundVideoUrl) as NSData
+
+        getLibraryPermissionIfNecessary { granted in
+            guard granted else {
+                print("❌ Photo library permission denied")
+                return
+            }
+        }
+
+        PHPhotoLibrary.shared().performChanges({
+            let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0];
+            let filePath = "\(documentsPath)/\(Date().description).jpeg"
+            videoData!.write(toFile: filePath, atomically: true)
+            PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: URL(fileURLWithPath: filePath))
+        },
+        completionHandler: { success, error in
+            if success {
+                let fetchOptions = PHFetchOptions()
+                fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                let fetchResult = PHAsset.fetchAssets(with: .image, options: fetchOptions)
+
+                if let lastAsset = fetchResult.firstObject {
+                    let localIdentifier = lastAsset.localIdentifier
+                    let urlFeed = "instagram://library?LocalIdentifier=" + localIdentifier
+
+                    guard let url = URL(string: urlFeed) else {
+                        print("❌ Invalid Instagram URL")
+                        return
+                    }
+                    DispatchQueue.main.async {
+                        if UIApplication.shared.canOpenURL(url) {
+                            if #available(iOS 10.0, *) {
+                                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                                print("📤 Instagram opened with image, waiting for app to become active...")
+                            } else {
+                                UIApplication.shared.openURL(url)
+                                print("📤 Instagram opened with image, waiting for app to become active...")
+                            }
+                        } else {
+                            print("❌ Cannot open Instagram URL")
+                        }
+                    }
+                }
+            } else if let error = error {
+                print("❌ Error: \(error.localizedDescription)")
+            }
+        })
+    }
 
     public func shareToSystem(args : [String: Any?],result: @escaping FlutterResult) {
         let text = args[argMessage] as? String
@@ -277,7 +390,7 @@ public class ShareUtil{
     func shareToWhatsApp(args : [String: Any?],result: @escaping FlutterResult)  {
         let message = args[self.argMessage] as? String
         let whatsURL = "whatsapp://send?text="+message!
-        
+
         var characterSet = CharacterSet.urlQueryAllowed
         characterSet.insert(charactersIn: "?&")
         let whatsAppURL  = NSURL(string: whatsURL.addingPercentEncoding(withAllowedCharacters: characterSet)!)
@@ -289,6 +402,28 @@ public class ShareUtil{
         else
         {
             result(ERROR_APP_NOT_AVAILABLE);
+        }
+    }
+
+    // WhatsApp share with pending result (result handled by lifecycle observer)
+    func shareToWhatsAppWithPendingResult(args : [String: Any?])  {
+        let message = args[self.argMessage] as? String
+        let whatsURL = "whatsapp://send?text="+message!
+
+        var characterSet = CharacterSet.urlQueryAllowed
+        characterSet.insert(charactersIn: "?&")
+        let whatsAppURL  = NSURL(string: whatsURL.addingPercentEncoding(withAllowedCharacters: characterSet)!)
+        if UIApplication.shared.canOpenURL(whatsAppURL! as URL)
+        {
+            UIApplication.shared.open(whatsAppURL! as URL)
+            // Don't call result here - lifecycle observer will handle it
+            print("📤 WhatsApp opened, waiting for app to become active...")
+        }
+        else
+        {
+            // App not available - need to clear pending result
+            // This will be handled by the caller checking canOpenURL first
+            print("❌ WhatsApp not available")
         }
     }
     
@@ -517,8 +652,8 @@ public class ShareUtil{
             result(ERROR_APP_NOT_AVAILABLE)
             return
         }
-        
-        
+
+
         let composeCtl = SLComposeViewController(forServiceType: SLServiceTypeTwitter)
         if #unavailable(iOS 16) {
             composeCtl?.add(URL(string: title!))
@@ -533,7 +668,32 @@ public class ShareUtil{
         result(SUCCESS)
     }
 
-    
+    // Twitter share with pending result (result handled by lifecycle observer)
+    func shareToTwitterWithPendingResult(args : [String: Any?]) {
+        let title = args[self.argMessage] as? String
+        let images = args[self.argImagePaths] as? [String]
+        if(!canOpenUrl(appName: "twitter")){
+            print("❌ Twitter not available")
+            return
+        }
+
+
+        let composeCtl = SLComposeViewController(forServiceType: SLServiceTypeTwitter)
+        if #unavailable(iOS 16) {
+            composeCtl?.add(URL(string: title!))
+        }
+        if(!(images==nil)){
+            for image in images! {
+                composeCtl?.add(UIImage.init(contentsOfFile: image))
+            }
+        }
+        composeCtl?.setInitialText(title!)
+        UIApplication.topViewController()?.present(composeCtl!,animated:true,completion:nil);
+        // Don't call result here - lifecycle observer will handle it
+        print("📤 Twitter compose controller presented, waiting for app to become active...")
+    }
+
+
     func shareToInstagramStory(args : [String: Any?],result: @escaping FlutterResult) {
         if #available(iOS 10.0, *){
             let appId = args[self.argAppId] as? String

@@ -63,11 +63,17 @@ public class SocialShareUtil {
     private final String FACEBOOK_MESSENGER_LITE_PACKAGE = "com.facebook.mlite";
     private final String SMS_DEFAULT_APPLICATION = "sms_default_application";
 
-    // Request code for Facebook share activity
+    // Request codes for share activities
     public static final int FACEBOOK_SHARE_REQUEST_CODE = 64206;
+    public static final int INSTAGRAM_SHARE_REQUEST_CODE = 64207;
+    public static final int TWITTER_SHARE_REQUEST_CODE = 64208;
+    public static final int WHATSAPP_SHARE_REQUEST_CODE = 64209;
 
     private static CallbackManager callbackManager;
     private static MethodChannel.Result pendingFacebookResult;
+    private static MethodChannel.Result pendingInstagramResult;
+    private static MethodChannel.Result pendingTwitterResult;
+    private static MethodChannel.Result pendingWhatsappResult;
 
     // Getter for CallbackManager to allow activity result forwarding
     public CallbackManager getCallbackManager() {
@@ -104,6 +110,163 @@ public class SocialShareUtil {
         }
 
         pendingFacebookResult = null;
+    }
+
+    // Handle activity result for Instagram share
+    public static void handleInstagramShareResult(int resultCode) {
+        if (pendingInstagramResult == null) {
+            System.out.println("⚠️ No pending Instagram result to handle");
+            return;
+        }
+
+        System.out.println("========================================");
+        System.out.println("Instagram Share Activity Result");
+        System.out.println("resultCode: " + resultCode);
+        System.out.println("========================================");
+
+        if (resultCode == android.app.Activity.RESULT_OK) {
+            System.out.println("✅ SUCCESS_NO_POST_ID: User returned from Instagram");
+            pendingInstagramResult.success(SUCCESS_NO_POST_ID);
+        } else if (resultCode == android.app.Activity.RESULT_CANCELED) {
+            System.out.println("❌ CANCELLED: User cancelled or dismissed");
+            pendingInstagramResult.success(CANCELLED);
+        } else {
+            System.out.println("⚠️ Unknown result code: " + resultCode);
+            pendingInstagramResult.success(SUCCESS_NO_POST_ID);
+        }
+
+        pendingInstagramResult = null;
+    }
+
+    // Handle activity result for Twitter share
+    public static void handleTwitterShareResult(int resultCode) {
+        if (pendingTwitterResult == null) {
+            System.out.println("⚠️ No pending Twitter result to handle");
+            return;
+        }
+
+        System.out.println("========================================");
+        System.out.println("Twitter Share Activity Result");
+        System.out.println("resultCode: " + resultCode);
+        System.out.println("========================================");
+
+        if (resultCode == android.app.Activity.RESULT_OK) {
+            System.out.println("✅ SUCCESS_NO_POST_ID: User returned from Twitter");
+            pendingTwitterResult.success(SUCCESS_NO_POST_ID);
+        } else if (resultCode == android.app.Activity.RESULT_CANCELED) {
+            System.out.println("❌ CANCELLED: User cancelled or dismissed");
+            pendingTwitterResult.success(CANCELLED);
+        } else {
+            System.out.println("⚠️ Unknown result code: " + resultCode);
+            pendingTwitterResult.success(SUCCESS_NO_POST_ID);
+        }
+
+        pendingTwitterResult = null;
+    }
+
+    // Handle activity result for WhatsApp share
+    public static void handleWhatsappShareResult(int resultCode) {
+        if (pendingWhatsappResult == null) {
+            System.out.println("⚠️ No pending WhatsApp result to handle");
+            return;
+        }
+
+        System.out.println("========================================");
+        System.out.println("WhatsApp Share Activity Result");
+        System.out.println("resultCode: " + resultCode);
+        System.out.println("========================================");
+
+        if (resultCode == android.app.Activity.RESULT_OK) {
+            System.out.println("✅ SUCCESS_NO_POST_ID: User returned from WhatsApp");
+            pendingWhatsappResult.success(SUCCESS_NO_POST_ID);
+        } else if (resultCode == android.app.Activity.RESULT_CANCELED) {
+            System.out.println("❌ CANCELLED: User cancelled or dismissed");
+            pendingWhatsappResult.success(CANCELLED);
+        } else {
+            System.out.println("⚠️ Unknown result code: " + resultCode);
+            pendingWhatsappResult.success(SUCCESS_NO_POST_ID);
+        }
+
+        pendingWhatsappResult = null;
+    }
+
+    // Share to Instagram with result tracking
+    public void shareToInstagramFeedWithResult(String imagePath, String message, Activity activity, MethodChannel.Result result) {
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        if (imagePath != null) {
+            Uri fileUri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".provider", new File(imagePath));
+            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            shareIntent.setType(getMimeTypeOfFile(imagePath));
+        } else {
+            shareIntent.setType("text/plain");
+        }
+        shareIntent.putExtra(Intent.EXTRA_TEXT, message);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        shareIntent.setPackage(INSTAGRAM_PACKAGE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            shareIntent.setComponent(ComponentName.createRelative(INSTAGRAM_PACKAGE,
+                "com.instagram.share.handleractivity.ShareHandlerActivity"));
+        }
+
+        if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
+            pendingInstagramResult = result;
+            activity.startActivityForResult(
+                Intent.createChooser(shareIntent, "Share to Instagram"),
+                INSTAGRAM_SHARE_REQUEST_CODE
+            );
+        } else {
+            result.success(ERROR_APP_NOT_AVAILABLE);
+        }
+    }
+
+    // Share to Twitter with result tracking
+    public void shareToTwitterWithResult(String imagePath, String message, Activity activity, MethodChannel.Result result) {
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        if (imagePath != null) {
+            Uri fileUri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".provider", new File(imagePath));
+            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            shareIntent.setType(getMimeTypeOfFile(imagePath));
+        } else {
+            shareIntent.setType("text/plain");
+        }
+        shareIntent.putExtra(Intent.EXTRA_TEXT, message);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        shareIntent.setPackage(TWITTER_PACKAGE);
+
+        if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
+            pendingTwitterResult = result;
+            activity.startActivityForResult(
+                Intent.createChooser(shareIntent, "Share to X"),
+                TWITTER_SHARE_REQUEST_CODE
+            );
+        } else {
+            result.success(ERROR_APP_NOT_AVAILABLE);
+        }
+    }
+
+    // Share to WhatsApp with result tracking
+    public void shareToWhatsAppWithResult(String imagePath, String message, Activity activity, MethodChannel.Result result) {
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        if (imagePath != null) {
+            Uri fileUri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".provider", new File(imagePath));
+            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            shareIntent.setType(getMimeTypeOfFile(imagePath));
+        } else {
+            shareIntent.setType("text/plain");
+        }
+        shareIntent.putExtra(Intent.EXTRA_TEXT, message);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        shareIntent.setPackage(WHATSAPP_PACKAGE);
+
+        if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
+            pendingWhatsappResult = result;
+            activity.startActivityForResult(
+                Intent.createChooser(shareIntent, "Share to WhatsApp"),
+                WHATSAPP_SHARE_REQUEST_CODE
+            );
+        } else {
+            result.success(ERROR_APP_NOT_AVAILABLE);
+        }
     }
 
     public String shareToWhatsApp(String imagePath, String msg, Context context) {

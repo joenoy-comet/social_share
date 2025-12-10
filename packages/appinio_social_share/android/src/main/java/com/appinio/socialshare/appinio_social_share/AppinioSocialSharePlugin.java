@@ -97,7 +97,9 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
             case INSTAGRAM_DIRECT:
                 return socialShareUtil.shareToInstagramDirect(message, activeContext);
             case INSTAGRAM_FEED:
-                return socialShareUtil.shareToInstagramFeed(imagePath, message, activeContext, message);
+                if (activity == null) return SocialShareUtil.UNKNOWN_ERROR;
+                socialShareUtil.shareToInstagramFeedWithResult(imagePath, message, activity, result);
+                return null;
             case INSTAGRAM_FEED_FILES:
                 return socialShareUtil.shareToInstagramFeedFiles(imagePaths, activeContext,message);
             case INSTAGRAM_STORIES:
@@ -111,7 +113,9 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
                 socialShareUtil.shareToFacebook(imagePaths, message, activity, result);
                 return null;
             case WHATSAPP_ANDROID:
-                return socialShareUtil.shareToWhatsApp(imagePath, message, activeContext);
+                if (activity == null) return SocialShareUtil.UNKNOWN_ERROR;
+                socialShareUtil.shareToWhatsAppWithResult(imagePath, message, activity, result);
+                return null;
             case WHATSAPP_ANDROID_MULTIFILES:
                 return socialShareUtil.shareToWhatsAppFiles(imagePaths, activeContext);
             case TELEGRAM_ANDROID:
@@ -119,7 +123,9 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
             case TELEGRAM_ANDROID_MULTIFILES:
                 return socialShareUtil.shareToTelegramFiles(imagePaths, activeContext);
             case TWITTER_ANDROID:
-                return socialShareUtil.shareToTwitter(imagePath, activeContext, message);
+                if (activity == null) return SocialShareUtil.UNKNOWN_ERROR;
+                socialShareUtil.shareToTwitterWithResult(imagePath, message, activity, result);
+                return null;
             case TWITTER_ANDROID_MULTIFILES:
                 return socialShareUtil.shareToTwitterFiles(imagePaths, activeContext);
             case COPY_TO_CLIPBOARD:
@@ -177,6 +183,24 @@ public class AppinioSocialSharePlugin implements FlutterPlugin, MethodCallHandle
         // Handle Facebook share activity result
         if (requestCode == SocialShareUtil.FACEBOOK_SHARE_REQUEST_CODE) {
             SocialShareUtil.handleFacebookShareResult(resultCode);
+            return true;
+        }
+
+        // Handle Instagram share activity result
+        if (requestCode == SocialShareUtil.INSTAGRAM_SHARE_REQUEST_CODE) {
+            SocialShareUtil.handleInstagramShareResult(resultCode);
+            return true;
+        }
+
+        // Handle Twitter share activity result
+        if (requestCode == SocialShareUtil.TWITTER_SHARE_REQUEST_CODE) {
+            SocialShareUtil.handleTwitterShareResult(resultCode);
+            return true;
+        }
+
+        // Handle WhatsApp share activity result
+        if (requestCode == SocialShareUtil.WHATSAPP_SHARE_REQUEST_CODE) {
+            SocialShareUtil.handleWhatsappShareResult(resultCode);
             return true;
         }
 
