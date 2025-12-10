@@ -27,11 +27,6 @@ class IOS {
         .shareToInstagramFeed("", imagePath);
   }
 
-  Future<String> shareToInstagramReels(String videoPath) {
-    return AppinioSocialSharePlatform.instance
-        .shareToInstagramFeed("", videoPath);
-  }
-
   Future<String> shareToMessenger(String message) {
     return AppinioSocialSharePlatform.instance.shareToMessenger(message);
   }

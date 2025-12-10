@@ -74,12 +74,10 @@ public class SwiftAppinioSocialSharePlugin: NSObject, FlutterPlugin, SharingDele
           shareUtil.shareToFacebookStory(args:args!,result:result)
           break
       case WHATSAPP_IMG_IOS:
-          pendingWhatsappResult = result
-          whatsappImageDidSend = false
-          shareUtil.shareImageToWhatsAppWithPendingResult(args:args!, delegate: self)
+          shareUtil.shareImageToWhatsApp(args:args!, result:result, delegate: self)
           break
       case WHATSAPP:
-          shareUtil.shareToWhatsAppWithCompletion(args:args!, result: result)
+          shareUtil.shareToWhatsApp(args:args!, result:result)
           break
       case TWITTER:
           shareUtil.shareToTwitterWithCompletion(args:args!, result: result)

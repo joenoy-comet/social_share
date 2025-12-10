@@ -40,11 +40,6 @@ class Android {
         .shareToInstagramFeedAndroid(imagePaths);
   }
 
-  Future<String> shareToInstagramReels(List<String> videoPaths) {
-    return AppinioSocialSharePlatform.instance
-        .shareToInstagramFeedAndroid(videoPaths);
-  }
-
   Future<String> shareToMessenger(String message) {
     return AppinioSocialSharePlatform.instance.shareToMessenger(message);
   }
