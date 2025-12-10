@@ -965,12 +965,11 @@ public class ShareUtil{
                                 try imageData.write(to: tempFile, options: .atomic)
                                 let documentInteractionController = UIDocumentInteractionController(url: tempFile)
                                 documentInteractionController.uti = "net.whatsapp.image"
-                                // Use presentPreview to go directly to WhatsApp instead of generic share sheet
-                                documentInteractionController.delegate = delegate as? UIDocumentInteractionControllerDelegate
-                                documentInteractionController.presentPreview(animated: true)
-
+                                documentInteractionController.presentOpenInMenu(from: CGRect.zero, in: UIApplication.topViewController()!.view, animated: true)
+                                result(self.SUCCESS)
                             } catch {
                                 print(error)
+                                result(self.ERROR)
                             }
                         }
                     
